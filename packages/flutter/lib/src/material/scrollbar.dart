@@ -35,6 +35,7 @@ class Scrollbar extends StatefulWidget {
   /// typically a [Scrollable] widget.
   const Scrollbar({
     Key key,
+    this.displayAlways = false,
     @required this.child,
   }) : super(key: key);
 
@@ -45,6 +46,7 @@ class Scrollbar extends StatefulWidget {
   ///
   /// Typically a [ListView] or [CustomScrollView].
   final Widget child;
+  final bool displayAlways;
 
   @override
   _ScrollbarState createState() => _ScrollbarState();
@@ -120,7 +122,9 @@ class _ScrollbarState extends State<Scrollbar> with TickerProviderStateMixin {
       _materialPainter.update(notification.metrics, notification.metrics.axisDirection);
       _fadeoutTimer?.cancel();
       _fadeoutTimer = Timer(_kScrollbarTimeToFade, () {
-        _fadeoutAnimationController.reverse();
+        if (widget.displayAlways == false) {
+          _fadeoutAnimationController.reverse();
+        }
         _fadeoutTimer = null;
       });
     }

@@ -35,9 +35,14 @@ class Scrollbar extends StatefulWidget {
   /// typically a [Scrollable] widget.
   const Scrollbar({
     Key key,
-    this.displayAlways = false,
     @required this.child,
+    this.scrollController,
+    this.displayAlways = false,
   }) : super(key: key);
+
+  final bool displayAlways;
+
+  final ScrollController scrollController;
 
   /// The widget below this widget in the tree.
   ///
@@ -46,7 +51,6 @@ class Scrollbar extends StatefulWidget {
   ///
   /// Typically a [ListView] or [CustomScrollView].
   final Widget child;
-  final bool displayAlways;
 
   @override
   _ScrollbarState createState() => _ScrollbarState();
@@ -85,8 +89,8 @@ class _ScrollbarState extends State<Scrollbar> with TickerProviderStateMixin {
 
     switch (_currentPlatform) {
       case TargetPlatform.iOS:
-        // On iOS, stop all local animations. CupertinoScrollbar has its own
-        // animations.
+      // On iOS, stop all local animations. CupertinoScrollbar has its own
+      // animations.
         _fadeoutTimer?.cancel();
         _fadeoutTimer = null;
         _fadeoutAnimationController.reset();
@@ -96,20 +100,33 @@ class _ScrollbarState extends State<Scrollbar> with TickerProviderStateMixin {
         _themeColor = theme.highlightColor.withOpacity(1.0);
         _textDirection = Directionality.of(context);
         _materialPainter = _buildMaterialScrollbarPainter();
+        WidgetsBinding.instance.addPostFrameCallback((duration) {
+          if (widget.displayAlways) {
+            widget.scrollController.position.didUpdateScrollPositionBy(0);
+          }
+        });
         break;
     }
   }
 
   ScrollbarPainter _buildMaterialScrollbarPainter() {
     return ScrollbarPainter(
-        color: _themeColor,
-        textDirection: _textDirection,
-        thickness: _kScrollbarThickness,
-        fadeoutOpacityAnimation: _fadeoutOpacityAnimation,
-      );
+      color: _themeColor,
+      textDirection: _textDirection,
+      thickness: _kScrollbarThickness,
+      fadeoutOpacityAnimation: _fadeoutOpacityAnimation,
+      padding: MediaQuery
+          .of(context)
+          .padding,
+    );
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    final ScrollMetrics metrics = notification.metrics;
+    if (metrics.maxScrollExtent <= metrics.minScrollExtent) {
+      return false;
+    }
+
     // iOS sub-delegates to the CupertinoScrollbar instead and doesn't handle
     // scroll notifications here.
     if (_currentPlatform != TargetPlatform.iOS
@@ -119,14 +136,15 @@ class _ScrollbarState extends State<Scrollbar> with TickerProviderStateMixin {
         _fadeoutAnimationController.forward();
       }
 
-      _materialPainter.update(notification.metrics, notification.metrics.axisDirection);
-      _fadeoutTimer?.cancel();
-      _fadeoutTimer = Timer(_kScrollbarTimeToFade, () {
-        if (widget.displayAlways == false) {
+      _materialPainter.update(
+          notification.metrics, notification.metrics.axisDirection);
+      if (!widget.displayAlways) {
+        _fadeoutTimer?.cancel();
+        _fadeoutTimer = Timer(_kScrollbarTimeToFade, () {
           _fadeoutAnimationController.reverse();
-        }
-        _fadeoutTimer = null;
-      });
+          _fadeoutTimer = null;
+        });
+      }
     }
     return false;
   }
@@ -144,6 +162,8 @@ class _ScrollbarState extends State<Scrollbar> with TickerProviderStateMixin {
     switch (_currentPlatform) {
       case TargetPlatform.iOS:
         return CupertinoScrollbar(
+          displayAlways: widget.displayAlways,
+          controller: widget.scrollController,
           child: widget.child,
         );
       case TargetPlatform.android:
